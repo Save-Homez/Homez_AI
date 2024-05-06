@@ -61,26 +61,33 @@ def predict_point():
         request_dto.workDay,
     ]
 
-    # startPoint와 확률 예측
-    predictions = predict_start_points(model, np.array([model_input]))
+    # 각 클래스의 확률 예측
+    probabilities = predict_start_points(model, np.array([model_input]))
+    class_labels = model.classes_  # 모델이 학습한 클래스 라벨
 
-    # 예측된 startPoint 라벨 인코딩 결과를 동 이름으로 변환
-    decoded_points = [
-        decode_start_point(label, code_to_label_df, dong_to_code_df) for label in predictions['startPoints']
-    ]
+    # 예측된 클래스 라벨을 동 이름으로 변환
+    decoded_points = [decode_start_point(label, code_to_label_df, dong_to_code_df) for label in class_labels]
 
-    # 동 이름에서 역 이름으로 변환
-    predicted_stations = [get_station_from_dong(dong, station_mapping_df) for dong in decoded_points]
+    # None 값을 제외하고 함수를 호출
+    predicted_stations = [get_station_from_dong(dong, station_mapping_df) for dong in decoded_points if
+                          dong is not None]
 
     # 결과 분류 및 처리
     point_list = []
     for time_range in [30, 60, 90, 120, 150]:
-        relevant_points = [
-            (dong, station, prob) for dong, station, prob in
-            zip(decoded_points, predicted_stations, predictions['probabilities'])
-            if get_travel_time(station, get_station_from_dong(request_dto.destPoint, station_mapping_df),
-                               travel_times_df) <= time_range
-        ]
+        relevant_points = []
+        for dong, station, prob in zip(decoded_points, predicted_stations, probabilities):
+            if station is not None and request_dto.destPoint is not None:
+                print(station)
+                dest_station = get_station_from_dong(request_dto.destPoint, station_mapping_df)
+                if dest_station is not None:
+                    print(dest_station)
+                    try:
+                        travel_time = get_travel_time(station, dest_station, travel_times_df)
+                        if travel_time <= time_range:
+                            relevant_points.append((dong, station, prob))
+                    except ValueError:
+                        continue  # 해당 역 이름에 대한 이동 시간 데이터가 없으면 무시
         top_points = sorted(relevant_points, key=lambda x: x[2], reverse=True)[:3]
         point_info_list = [
             PointInfo(name=dong, matchRate=f"{prob * 100:.2f}%", rank=i + 1)
@@ -90,6 +97,7 @@ def predict_point():
 
     response_dto = ReportResponseDto(pointList=point_list)
     return jsonify(response_dto.dict())
+
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
