@@ -1,8 +1,9 @@
 from pydantic import BaseModel
 from typing import List
 
-class reportRequestDto(BaseModel):
+class ReportRequestDto(BaseModel):
     factors: List[str]
+    station: str
     destPoint: str
     timeRange: str
     sex: bool
@@ -10,14 +11,14 @@ class reportRequestDto(BaseModel):
     workDay: bool
     arrivalTime: int
 
-class pointInfo(BaseModel):
+class PointInfo(BaseModel):
     name: str
     matchRate: str
     rank: int
 
-class timeRangeGroup(BaseModel):
+class TimeRangeGroup(BaseModel):
     timeRange: str
-    pointInfo: List[pointInfo]
+    pointInfo: List[PointInfo]
 
-class reportResponseDto(BaseModel):
-    pointList: List[timeRangeGroup]
+class ReportResponseDto(BaseModel):
+    pointList: List[TimeRangeGroup]
