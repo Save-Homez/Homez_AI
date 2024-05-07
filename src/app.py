@@ -19,6 +19,9 @@ print("모델 로딩 완료")
 dong_to_code_df, code_to_label_df = load_mapping_data()
 station_mapping_df = load_station_mapping()
 travel_times_df = load_travel_times()
+print(travel_times_df.index.tolist())  # 인덱스 목록 출력
+print(travel_times_df.columns.tolist())  # 컬럼 목록 출력
+
 
 # 사용자로부터 선호하는 요소와 기본 정보를 입력받아 사용자의 거주지를 추천하는 api입니다.
 @app.post('/api/report/ml')
@@ -71,10 +74,34 @@ def predict_point():
     # None 값을 제외하고 함수를 호출
     predicted_stations = [get_station_from_dong(dong, station_mapping_df) for dong in decoded_points if
                           dong is not None]
-
+    # # 결과 분류 및 처리
+    # point_list = []
+    # for time_range in [30, 60, 90, 120, 150]:
+    #     relevant_points = []
+    #     for dong, station, prob in zip(decoded_points, predicted_stations, probabilities):
+    #         if station is not None and request_dto.destPoint is not None:
+    #             print(station)
+    #             dest_station = get_station_from_dong(request_dto.destPoint, station_mapping_df)
+    #             if dest_station is not None:
+    #                 print(dest_station)
+    #                 try:
+    #                     travel_time = get_travel_time(station, dest_station, travel_times_df)
+    #                     if travel_time <= time_range:
+    #                         relevant_points.append((dong, station, prob))
+    #                 except ValueError:
+    #                     continue  # 해당 역 이름에 대한 이동 시간 데이터가 없으면 무시
+    #     top_points = sorted(relevant_points, key=lambda x: x[2], reverse=True)[:3]
+    #     point_info_list = [
+    #         PointInfo(name=dong, matchRate=f"{prob * 100:.2f}%", rank=i + 1)
+    #         for i, (dong, station, prob) in enumerate(top_points)
+    #     ]
+    #     point_list.append(TimeRangeGroup(timeRange=f"Within {time_range} minutes", pointInfo=point_info_list))
     # 결과 분류 및 처리
     point_list = []
-    for time_range in [30, 60, 90, 120, 150]:
+    time_ranges = [30, 60, 90, 120, 150]
+    previous_time_range = 0  # 이전 time range의 최대값 저장
+
+    for idx, time_range in enumerate(time_ranges):
         relevant_points = []
         for dong, station, prob in zip(decoded_points, predicted_stations, probabilities):
             if station is not None and request_dto.destPoint is not None:
@@ -84,16 +111,29 @@ def predict_point():
                     print(dest_station)
                     try:
                         travel_time = get_travel_time(station, dest_station, travel_times_df)
-                        if travel_time <= time_range:
+                        # 이전 time range를 넘어서고 현재 time range 이하인지 확인
+                        if previous_time_range < travel_time <= time_range:
                             relevant_points.append((dong, station, prob))
                     except ValueError:
                         continue  # 해당 역 이름에 대한 이동 시간 데이터가 없으면 무시
-        top_points = sorted(relevant_points, key=lambda x: x[2], reverse=True)[:3]
+        # 다음 loop를 위해 현재 time range 저장
+        previous_time_range = time_range
+
+        # top_points = sorted(relevant_points, key=lambda x: x[2], reverse=True)[:3]
+        top_points = sorted(relevant_points, key=lambda x: x[2], reverse=True)
+        print(top_points)
+
+        # None을 포함하지 않는 요소만 필터링하여 정렬
+        filtered_points = [point for point in top_points if point[0] is not None]
+
+        # 필터링된 요소에 대해 정렬 수행
+        sorted_points = sorted(filtered_points, key=lambda x: x[2], reverse=True)[:10]
+
         point_info_list = [
-            PointInfo(name=dong, matchRate=f"{prob * 100:.2f}%", rank=i + 1)
-            for i, (dong, station, prob) in enumerate(top_points)
+            PointInfo(name=dong, matchRate=f"{prob * 100:.2f}", rank=i + 1)
+            for i, (dong, station, prob) in enumerate(sorted_points)
         ]
-        point_list.append(TimeRangeGroup(timeRange=f"Within {time_range} minutes", pointInfo=point_info_list))
+        point_list.append(TimeRangeGroup(timeRange=f"WITHIN_{time_range}_MINUTES", pointInfo=point_info_list))
 
     response_dto = ReportResponseDto(pointList=point_list)
     return jsonify(response_dto.dict())

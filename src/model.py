@@ -60,7 +60,7 @@ def decode_start_point(encoded_label, code_to_label_df, dong_to_code_df):
 def predict_start_points(model, input_data):
     probabilities = model.predict_proba(input_data)
 
-    return probabilities
+    return probabilities[0]
 
 # 동 이름에서 역 이름으로 매핑하는 데이터 로드
 def load_station_mapping():
@@ -69,7 +69,8 @@ def load_station_mapping():
 
 # 역 간 이동 시간 데이터 로드
 def load_travel_times():
-    travel_times_df = pd.read_csv('../data/shortest_path_costs.csv')
+    # CSV 파일 로드, 첫 번째 열을 인덱스로 사용하고 첫 번째 행을 컬럼 헤더로 사용
+    travel_times_df = pd.read_csv('../data/shortest_path_costs.csv', index_col=0, header=0)
     return travel_times_df
 
 # 동 이름을 입력받아 해당하는 역 이름 반환
@@ -102,19 +103,27 @@ def get_station_from_dong(dong_name, station_mapping_df):
 
 def get_travel_time(start_station, dest_station, travel_times_df):
     # 역 이름의 부분 문자열로 해당 역을 포함하는 첫 번째 역 이름을 찾는 과정
+    import re
+
     def find_station_containing(substring, df):
-        filtered = df.columns[df.columns.str.contains(substring, case=False, regex=True, na=False)]
+        # 특수 문자가 포함된 경우를 위해 정규식 사용
+        pattern = re.escape(substring)  # 괄호 같은 특수 문자를 리터럴 문자로 처리
+        filtered = df.columns[df.columns.str.contains(pattern, case=False, regex=True, na=False)]
+        print(f"Searching for '{substring}'. Matches found: {filtered}")  # 디버깅 정보 출력
         return filtered[0] if not filtered.empty else None
 
     start_station_match = find_station_containing(start_station, travel_times_df)
     dest_station_match = find_station_containing(dest_station, travel_times_df)
+
+    print(f"Matched start station: {start_station_match}")  # 시작역 매치 결과 출력
+    print(f"Matched destination station: {dest_station_match}")  # 도착역 매치 결과 출력
 
     if not start_station_match or not dest_station_match:
         raise ValueError(f"Travel time data unavailable for stations: {start_station} or {dest_station}.")
 
     try:
         travel_time = travel_times_df.loc[start_station_match, dest_station_match]
+        print(f"Travel time from {start_station_match} to {dest_station_match}: {travel_time}")  # 조회된 이동 시간 출력
         return travel_time
     except KeyError:
         raise ValueError(f"Travel time data unavailable for stations: {start_station_match} or {dest_station_match}.")
-
