@@ -8,6 +8,7 @@ from dto import ReportRequestDto, ReportResponseDto, PointInfo, TimeRangeGroup
 from model import load_model, predict_start_points
 from model import load_mapping_data, encode_dest_point, decode_start_point
 from model import load_station_mapping, load_travel_times, get_travel_time, get_station_from_dong
+from matching import calculate_match_rate
 
 app = Flask(__name__)
 
@@ -74,28 +75,7 @@ def predict_point():
     # None 값을 제외하고 함수를 호출
     predicted_stations = [get_station_from_dong(dong, station_mapping_df) for dong in decoded_points if
                           dong is not None]
-    # # 결과 분류 및 처리
-    # point_list = []
-    # for time_range in [30, 60, 90, 120, 150]:
-    #     relevant_points = []
-    #     for dong, station, prob in zip(decoded_points, predicted_stations, probabilities):
-    #         if station is not None and request_dto.destPoint is not None:
-    #             print(station)
-    #             dest_station = get_station_from_dong(request_dto.destPoint, station_mapping_df)
-    #             if dest_station is not None:
-    #                 print(dest_station)
-    #                 try:
-    #                     travel_time = get_travel_time(station, dest_station, travel_times_df)
-    #                     if travel_time <= time_range:
-    #                         relevant_points.append((dong, station, prob))
-    #                 except ValueError:
-    #                     continue  # 해당 역 이름에 대한 이동 시간 데이터가 없으면 무시
-    #     top_points = sorted(relevant_points, key=lambda x: x[2], reverse=True)[:3]
-    #     point_info_list = [
-    #         PointInfo(name=dong, matchRate=f"{prob * 100:.2f}%", rank=i + 1)
-    #         for i, (dong, station, prob) in enumerate(top_points)
-    #     ]
-    #     point_list.append(TimeRangeGroup(timeRange=f"Within {time_range} minutes", pointInfo=point_info_list))
+
     # 결과 분류 및 처리
     point_list = []
     time_ranges = [30, 60, 90, 120, 150]
@@ -125,13 +105,38 @@ def predict_point():
 
         # None을 포함하지 않는 요소만 필터링하여 정렬
         filtered_points = [point for point in top_points if point[0] is not None]
+        print(filtered_points)
+
+        # 사용자 선호도에 따른 매칭율 계산 수행
+        user_preferences = request_dto.factors
+        # user_age = request_dto.age
+        # user_sex = request_dto.sex
+
+        # 최대 확률 값으로 나누어 스케일링
+        max_prob = max(filtered_points, key=lambda x: x[2])[2] if filtered_points else 1
+        normalized_probs = [prob / max_prob for _, _, prob in filtered_points]
+        # 각 동에 대해 매칭율 계산 후 결과 튜플에 추가
+        enhanced_points = []
+        for (dong, station, prob), norm_prob in zip(filtered_points, normalized_probs):
+            preferences_prob = calculate_match_rate(dong, user_preferences)
+            weighted_prob = (norm_prob + preferences_prob) / 2
+            enhanced_points.append((dong, station, prob, preferences_prob, weighted_prob))
+
+        # # 각 동에 대해 매칭율 계산 후 결과 튜플에 추가
+        # enhanced_points = []
+        # for dong, station, prob in filtered_points:
+        #     preferences_prob = calculate_match_rate(dong, user_preferences)
+        #     # 제곱근 스케일링
+        #     scaled_prob = np.sqrt(prob)
+        #     weighted_prob = (scaled_prob + preferences_prob) / 2
+        #     enhanced_points.append((dong, station, prob, preferences_prob, weighted_prob))
 
         # 필터링된 요소에 대해 정렬 수행
-        sorted_points = sorted(filtered_points, key=lambda x: x[2], reverse=True)[:10]
-
+        # sorted_points = sorted(filtered_points, key=lambda x: x[2], reverse=True)[:10] # prob 기준
+        sorted_points = sorted(enhanced_points, key=lambda x: x[4], reverse=True)[:10] # 선호 기준
         point_info_list = [
-            PointInfo(name=dong, matchRate=f"{prob * 100:.2f}", rank=i + 1)
-            for i, (dong, station, prob) in enumerate(sorted_points)
+            PointInfo(name=dong, matchRate=f"{weighted_prob * 100:.2f}", rank=i + 1)
+            for i, (dong, station, prob, preferences_prob, weighted_prob) in enumerate(sorted_points)
         ]
         point_list.append(TimeRangeGroup(timeRange=f"WITHIN_{time_range}_MINUTES", pointInfo=point_info_list))
 

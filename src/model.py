@@ -64,7 +64,7 @@ def predict_start_points(model, input_data):
 
 # 동 이름에서 역 이름으로 매핑하는 데이터 로드
 def load_station_mapping():
-    station_mapping_df = pd.read_csv('../data/station_dong.csv')
+    station_mapping_df = pd.read_csv('../data/station-town.csv')
     return station_mapping_df
 
 # 역 간 이동 시간 데이터 로드
