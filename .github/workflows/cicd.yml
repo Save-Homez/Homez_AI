@@ -22,7 +22,7 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t username/my-flask-app:${{ github.sha }} .
+        docker build -t chaiwonhwang917/save-homez:${{ github.sha }} .
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v1
@@ -32,7 +32,7 @@ jobs:
 
     - name: Push Docker image to Docker Hub
       run: |
-        docker push username/my-flask-app:${{ github.sha }}
+        docker push chaiwonhwang917/save-homez:${{ github.sha }}
 
     - name: Deploy to AWS EC2
       uses: appleboy/ssh-action@master
@@ -41,7 +41,7 @@ jobs:
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          docker pull username/my-flask-app:${{ github.sha }}
-          docker stop flask-app || true
-          docker rm flask-app || true
-          docker run -d --name flask-app -p 80:5000 username/my-flask-app:${{ github.sha }}
+          docker pull chaiwonhwang917/save-homez:${{ github.sha }}
+          docker stop homez-ai || true
+          docker rm homez-ai || true
+          docker run -d --name homez-ai -p 80:5000 chaiwonhwang917/save-homez:${{ github.sha }}
