@@ -2,6 +2,7 @@
 import numpy as np
 from flask import Flask, request, jsonify
 import pickle
+import psutil
 import json
 
 from dto import ReportRequestDto, ReportResponseDto, PointInfo, TimeRangeGroup
@@ -12,8 +13,15 @@ from matching import calculate_match_rate
 
 app = Flask(__name__)
 
-# 모델 초기화
+# 프로세스 객체 생성
+process = psutil.Process()
+# 모델 로드 전 메모리 사용량
+mem_before = process.memory_info().rss
 model = load_model()
+# 모델 로드 후 메모리 사용량
+mem_after = process.memory_info().rss
+
+print(f"Memory used to load model: {(mem_after - mem_before) / 1024 ** 2:.2f} MB")
 print("모델 로딩 완료")
 
 # 데이터 매핑을 위한 데이터프레임 로드

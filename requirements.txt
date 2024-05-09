@@ -4,3 +4,4 @@ pandas
 xgboost
 sklearn
 pydantic
+psutil
