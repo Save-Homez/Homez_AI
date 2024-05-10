@@ -94,7 +94,8 @@ def predict_point():
         for dong, station, prob in zip(decoded_points, predicted_stations, probabilities):
             if station is not None and request_dto.destPoint is not None:
                 print(station)
-                dest_station = get_station_from_dong(request_dto.destPoint, station_mapping_df)
+                # dest_station = get_station_from_dong(request_dto.destPoint, station_mapping_df)
+                dest_station = request_dto.station
                 if dest_station is not None:
                     print(dest_station)
                     try:
