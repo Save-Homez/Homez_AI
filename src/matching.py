@@ -5,14 +5,20 @@ dong_features = pd.read_csv('../data/normalized_preferences.csv', index_col='동
 
 
 def calculate_match_rate(dong, user_preferences):
-    # dong의 특성 데이터 가져오기
     try:
         dong_data = dong_features.loc[dong].to_dict()
     except KeyError:
-        # dong 키가 없는 경우, 매칭 불가로 0을 반환
         return 0
 
-    total_score = sum(dong_data.get(pref, 0) for pref in user_preferences)
-    max_score = len(user_preferences)  # 각 선호 요소에 가중치 1을 부여
+    total_score = 0
+    for pref in user_preferences:
+        value = dong_data.get(pref, 0)
+        if isinstance(value, (int, float)):  # 값 유효성 검사
+            total_score += value
+        else:
+            continue  # 유효하지 않은 값은 무시
+
+    max_score = len(user_preferences)
     match_rate = (total_score / max_score) if max_score != 0 else 0
     return match_rate
+

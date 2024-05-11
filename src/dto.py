@@ -16,9 +16,25 @@ class PointInfo(BaseModel):
     matchRate: str
     rank: int
 
+
 class TimeRangeGroup(BaseModel):
     timeRange: str
     pointInfo: List[PointInfo]
 
 class ReportResponseDto(BaseModel):
     pointList: List[TimeRangeGroup]
+
+class ListPointInfo(BaseModel):
+    name: str
+    matchRate: str
+class MLListRequestDto(BaseModel):
+    factors: List[str]
+    destPoint: str
+    timeRange: str
+    sex: bool
+    age: int
+    workDay: bool
+    arrivalTime: int
+
+class MLListResponseDto(BaseModel):
+    pointList: List[ListPointInfo]

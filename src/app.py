@@ -6,6 +6,7 @@ import psutil
 import json
 
 from dto import ReportRequestDto, ReportResponseDto, PointInfo, TimeRangeGroup
+from dto import ListPointInfo, MLListRequestDto, MLListResponseDto
 from model import load_model, predict_start_points
 from model import load_mapping_data, encode_dest_point, decode_start_point
 from model import load_station_mapping, load_travel_times, get_travel_time, get_station_from_dong
@@ -31,6 +32,13 @@ travel_times_df = load_travel_times()
 print(travel_times_df.index.tolist())  # 인덱스 목록 출력
 print(travel_times_df.columns.tolist())  # 컬럼 목록 출력
 
+
+def logistic_scale(prob, scale=1):
+    return 1 / (1 + np.exp(-prob * scale))
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0)
 
 # 사용자로부터 선호하는 요소와 기본 정보를 입력받아 사용자의 거주지를 추천하는 api입니다.
 @app.post('/api/report/ml')
@@ -152,6 +160,80 @@ def predict_point():
     response_dto = ReportResponseDto(pointList=point_list)
     return jsonify(response_dto.dict())
 
+@app.post('/api/report/ml-list')
+def predict_point_list():
+    data = request.get_json()
+    try:
+        request_dto = MLListRequestDto(**data)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    # 입력 데이터에서 모델 입력 데이터 생성
+    # Dow,Arrival_time,Start_pt,Dest_pt,Sex,Age,Move_time,Move_num,Wday
+    dow = 0 # 수정 필요
+    move_num = 0 # 수정 필요
+
+    if request_dto.timeRange=="WITHIN_30_MINUTES":
+        move_time = 30.0
+    elif request_dto.timeRange=="WITHIN_60_MINUTES":
+        move_time = 60.0
+    elif request_dto.timeRange=="WITHIN_90_MINUTES":
+        move_time = 90.0
+    elif request_dto.timeRange=="WITHIN_120_MINUTES":
+        move_time = 120.0
+    else:
+        move_time = 150.0
+
+    # 도착지 라벨 인코딩에 맞게 매핑
+    # 1. 동 이름 -> 코드
+    # 2. 코드 -> 라벨 인코딩
+    dest_point_encoded = encode_dest_point(request_dto.destPoint, dong_to_code_df, code_to_label_df)
+
+    model_input = [
+        dow,
+        request_dto.arrivalTime,
+        dest_point_encoded,
+        request_dto.sex,
+        request_dto.age,
+        move_time,
+        move_num,
+        request_dto.workDay,
+    ]
+
+    # 각 클래스의 확률 예측
+    probabilities = predict_start_points(model, np.array([model_input]))
+    class_labels = model.classes_  # 모델이 학습한 클래스 라벨
+
+    # 예측된 클래스 라벨을 동 이름으로 변환, None 값 제외
+    decoded_points = [decode_start_point(label, code_to_label_df, dong_to_code_df) for label in class_labels]
+    decoded_points = [point for point in decoded_points if point is not None]
+
+    # 사용자 선호도에 따른 매칭율 계산, None 값 제외
+    user_preferences = request_dto.factors
+
+    # logistic_probabilities = [logistic_scale(prob) for prob in probabilities]
+    #
+    # point_list = []
+    # for dong, log_prob in zip(decoded_points, logistic_probabilities):
+    #     preferences_prob = calculate_match_rate(dong, user_preferences)
+    #     weighted_prob = (log_prob + preferences_prob) / 2
+    #     logistic_weighted_prob = logistic_scale(weighted_prob)
+    #     point_list.append((dong, f"{logistic_weighted_prob * 100:.2f}%"))
+
+    softmax_probabilities = softmax(probabilities)
+
+    point_list = []
+    for dong, softmax_prob in zip(decoded_points, softmax_probabilities):
+        preferences_prob = calculate_match_rate(dong, user_preferences)
+        weighted_prob = (softmax_prob + preferences_prob) / 2
+        point_list.append((dong, f"{weighted_prob * 100:.2f}%"))
+
+    # 결과 정렬 및 최종 DTO 생성
+    sorted_points = sorted(point_list, key=lambda x: x[1], reverse=True)
+    point_info_list = [ListPointInfo(name=dong, matchRate=matchRate) for dong, matchRate in sorted_points]
+
+    response_dto = MLListResponseDto(pointList=point_info_list)
+    return jsonify(response_dto.dict())
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
