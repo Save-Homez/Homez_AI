@@ -40,6 +40,9 @@ def softmax(x):
     e_x = np.exp(x - np.max(x))
     return e_x / e_x.sum(axis=0)
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
 # 사용자로부터 선호하는 요소와 기본 정보를 입력받아 사용자의 거주지를 추천하는 api입니다.
 @app.post('/api/report/ml')
 def predict_point():
@@ -220,12 +223,21 @@ def predict_point_list():
     #     logistic_weighted_prob = logistic_scale(weighted_prob)
     #     point_list.append((dong, f"{logistic_weighted_prob * 100:.2f}%"))
 
-    softmax_probabilities = softmax(probabilities)
+    # softmax_probabilities = softmax(probabilities)
+    #
+    # point_list = []
+    # for dong, softmax_prob in zip(decoded_points, softmax_probabilities):
+    #     preferences_prob = calculate_match_rate(dong, user_preferences)
+    #     weighted_prob = (softmax_prob + preferences_prob) / 2
+    #     point_list.append((dong, f"{weighted_prob * 100:.2f}%"))
+
+    # 확률 데이터를 시그모이드 함수로 변환
+    sigmoid_probabilities = [sigmoid(prob) for prob in probabilities]
 
     point_list = []
-    for dong, softmax_prob in zip(decoded_points, softmax_probabilities):
+    for dong, sigmoid_prob in zip(decoded_points, sigmoid_probabilities):
         preferences_prob = calculate_match_rate(dong, user_preferences)
-        weighted_prob = (softmax_prob + preferences_prob) / 2
+        weighted_prob = (sigmoid_prob + preferences_prob) / 2
         point_list.append((dong, f"{weighted_prob * 100:.2f}%"))
 
     # 결과 정렬 및 최종 DTO 생성
