@@ -41,6 +41,11 @@ jobs:
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
+          # Clean up Docker space: Remove all stopped containers, unused images and networks
+          docker system prune -af
+          # Optionally remove volumes not used by at least one container
+          docker volume prune -f
+          
           docker pull chaiwonhwang917/save-homez:${{ github.sha }}
           docker stop homez-ai || true
           docker rm homez-ai || true
