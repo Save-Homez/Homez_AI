@@ -238,7 +238,7 @@ def predict_point_list():
     for dong, sigmoid_prob in zip(decoded_points, sigmoid_probabilities):
         preferences_prob = calculate_match_rate(dong, user_preferences)
         weighted_prob = (sigmoid_prob + preferences_prob) / 2
-        point_list.append((dong, f"{weighted_prob * 100:.2f}%"))
+        point_list.append((dong, f"{weighted_prob * 100:.2f}"))
 
     # 결과 정렬 및 최종 DTO 생성
     sorted_points = sorted(point_list, key=lambda x: x[1], reverse=True)
