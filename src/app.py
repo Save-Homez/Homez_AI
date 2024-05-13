@@ -242,8 +242,19 @@ def predict_point_list():
 
     # 결과 정렬 및 최종 DTO 생성
     sorted_points = sorted(point_list, key=lambda x: x[1], reverse=True)
-    point_info_list = [ListPointInfo(name=dong, matchRate=matchRate) for dong, matchRate in sorted_points]
+    # point_info_list = [ListPointInfo(name=dong, matchRate=matchRate) for dong, matchRate in sorted_points]
 
+    # point info list에서 넘어가면 안되는 동네는 제외
+    # 제외할 동네 목록
+    excluded_neighborhoods = [
+        "평창동", "정릉3동", "정릉4동", "우이동", "방학3동", "서림동", "난향동", "대학동",
+        "난곡동", "삼성동", "양재2동", "내곡동", "세곡동", "개포2동", "신사동"
+    ]
+    # 제외할 동네를 필터링하여 최종 리스트 생성
+    point_info_list = [
+        ListPointInfo(name=dong, matchRate=matchRate)
+        for dong, matchRate in sorted_points if dong not in excluded_neighborhoods
+    ]
     response_dto = MLListResponseDto(pointList=point_info_list)
     return jsonify(response_dto.dict())
 
